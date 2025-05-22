@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUASAR LABS - MAINFRAME XR-8 // SECURE NEXUS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-haiti: #0d0b2c;
+            --color-east-side: #b987ce; /* Purple - Will be used for former red alerts/errors */
+            --color-picton-blue: #54b2e1; /* Blue - Will be used for former yellow warnings */
+            --color-daisy-bush: #592bab; /* Darker Purple */
+            /* Removed --color-red-alert and --color-yellow-warning as direct variables for alerts/warnings */
+            --color-green-success: #22c55e;
+            --color-dark-accent: #1a173d; /* Darker version of Haiti for depth */
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--color-haiti);
+            color: var(--color-picton-blue);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden; /* Prevent horizontal scroll from subtle glows */
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-daisy-bush) var(--color-haiti);
+        }
+        body::-webkit-scrollbar {
+            width: 8px;
+        }
+        body::-webkit-scrollbar-track {
+            background: var(--color-haiti);
+        }
+        body::-webkit-scrollbar-thumb {
+            background-color: var(--color-daisy-bush);
+            border-radius: 4px;
+            border: 1px solid var(--color-east-side);
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #terminal-output::-webkit-scrollbar {
+            width: 6px;
+        }
+        #terminal-output::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        #terminal-output::-webkit-scrollbar-thumb {
+            background: var(--color-daisy-bush);
+            border-radius: 3px;
+        }
+        #terminal-output::-webkit-scrollbar-thumb:hover {
+            background: var(--color-east-side);
+        }
+
+        .blink {
+            animation: blink-animation 1.2s step-end infinite;
+        }
+        @keyframes blink-animation {
+            50% { opacity: 0.4; } /* Slightly more visible blink */
+        }
+
+        .prompt-text {
+            user-select: none; -webkit-user-select: none; -ms-user-select: none;
+        }
+
+        .text-glow-blue {
+            text-shadow: 0 0 4px var(--color-picton-blue), 0 0 8px var(--color-picton-blue), 0 0 12px var(--color-daisy-bush);
+        }
+        .text-glow-purple { /* Was text-glow-red, now for purple alerts/errors */
+            text-shadow: 0 0 4px var(--color-east-side), 0 0 8px var(--color-east-side), 0 0 12px var(--color-daisy-bush);
+        }
+        /* Removed text-glow-red class as it's replaced by text-glow-purple */
+
+        .section-pulse-glow {
+            animation: pulse-glow-animation 5s infinite alternate;
+        }
+        @keyframes pulse-glow-animation {
+            0% { box-shadow: 0 0 8px 0px rgba(84, 178, 225, 0.2), 0 0 15px 0px rgba(89, 43, 171, 0.15), inset 0 0 5px rgba(89, 43, 171, 0.1); }
+            100% { box-shadow: 0 0 15px 3px rgba(84, 178, 225, 0.4), 0 0 30px 5px rgba(89, 43, 171, 0.25), inset 0 0 10px rgba(89, 43, 171, 0.2); }
+        }
+        
+        .header-pulse-glow {
+            animation: header-pulse-animation 3.5s infinite alternate;
+        }
+        @keyframes header-pulse-animation {
+            0% { box-shadow: 0 1px 10px 0px rgba(185, 135, 206, 0.3), 0 0 8px 0px rgba(84, 178, 225, 0.2); }
+            100% { box-shadow: 0 2px 20px 3px rgba(185, 135, 206, 0.5), 0 0 15px 3px rgba(84, 178, 225, 0.4); }
+        }
+
+        .terminal-bg-scanlines {
+            position: relative; overflow: hidden;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .terminal-bg-scanlines::before {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            background: linear-gradient( to bottom, transparent 50%, rgba(89, 43, 171, 0.06) 50.5%, transparent 51% );
+            background-size: 100% 3px; 
+            animation: scanline-animation 20s linear infinite;
+            z-index: 0;
+        }
+        @keyframes scanline-animation {
+            100% { background-position: 0 -200px; }
+        }
+        #terminal-output, #terminal-input-container { position: relative; z-index: 1; }
+
+        #terminal-input:focus {
+            border-bottom: 1px solid var(--color-picton-blue);
+            animation: input-focus-pulse 1.2s infinite alternate;
+        }
+        @keyframes input-focus-pulse {
+            from { box-shadow: 0 1px 2px 0 var(--color-picton-blue); }
+            to { box-shadow: 0 1px 8px 0 var(--color-picton-blue); }
+        }
+
+        ::selection { background-color: var(--color-east-side); color: var(--color-haiti); }
+        ::-moz-selection { background-color: var(--color-east-side); color: var(--color-haiti); }
+
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--color-haiti);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 9999;
+            opacity: 1;
+            transition: opacity 0.7s ease-out;
+        }
+        #loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .loader-logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem; 
+            color: var(--color-picton-blue);
+            text-shadow: 0 0 5px var(--color-picton-blue), 0 0 15px var(--color-daisy-bush);
+            margin-bottom: 2rem; 
+        }
+        .loader-logo span { color: var(--color-east-side); }
+        #progress-bar-container {
+            width: 70%; max-width: 400px; height: 10px;
+            background-color: var(--color-dark-accent);
+            border: 1px solid var(--color-daisy-bush);
+            border-radius: 5px; overflow: hidden;
+            margin-bottom: 1rem; 
+        }
+        #progress-bar {
+            width: 0%; height: 100%;
+            background: linear-gradient(90deg, var(--color-daisy-bush) 0%, var(--color-east-side) 50%, var(--color-picton-blue) 100%);
+            transition: width 0.2s ease-out;
+            box-shadow: 0 0 5px var(--color-picton-blue);
+        }
+        #loading-message {
+            color: var(--color-east-side);
+            font-size: 0.875rem; 
+            letter-spacing: 0.1em;
+            min-height: 20px; 
+        }
+        #loading-screen::after {
+            content: ""; position: absolute; top:0; left:0; width:100%; height:100%;
+            background-image: 
+                linear-gradient(var(--color-daisy-bush) 1px, transparent 1px),
+                linear-gradient(to right, var(--color-daisy-bush) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.05;
+            z-index: -1;
+            animation: bg-grid-scroll 60s linear infinite;
+        }
+        @keyframes bg-grid-scroll {
+            100% { background-position: 800px 800px; }
+        }
+
+        .sleek-border { border-color: var(--color-daisy-bush); }
+        .sleek-border-t { border-top-color: var(--color-daisy-bush); }
+        .sleek-border-b { border-bottom-color: var(--color-daisy-bush); }
+
+        .status-icon {
+            width: 1em; height: 1em; display: inline-block;
+            vertical-align: middle; margin-right: 0.3em;
+        }
+        /* SVG icon for former red alerts, now purple */
+        .status-icon-alert { 
+            fill: var(--color-east-side);
+        }
+        /* SVG icon for former yellow warnings, now blue */
+        .status-icon-warning {
+            fill: var(--color-picton-blue);
+        }
+
+
+    </style>
+</head>
+<body class="selection:bg-east-side selection:text-haiti">
+
+    <div id="loading-screen">
+        <div class="loader-logo">QUASAR <span>LABS</span></div>
+        <div id="progress-bar-container">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="loading-message">INITIALIZING...</div>
+    </div>
+
+    <div id="app-container" class="flex flex-col min-h-screen">
+        <header class="p-3 md:p-4 border-b-2 sleek-border-b bg-[var(--color-haiti)]/80 backdrop-blur-md header-pulse-glow sticky top-0 z-50">
+            <h1 class="text-2xl sm:text-3xl font-bold text-center tracking-wider orbitron text-glow-blue">
+                <span class="text-[var(--color-east-side)] animate-pulse">[</span> QUASAR LABS <span class="text-[var(--color-east-side)]">-</span> MAINFRAME NEXUS <span class="text-[var(--color-east-side)] animate-pulse">]</span>
+            </h1>
+            <p class="text-center text-xs sm:text-sm text-[var(--color-east-side)]">CLASSIFIED ACCESS TERMINAL XR-8 // SECURITY LEVEL: <span class="text-[var(--color-east-side)] font-bold text-glow-purple">OMEGA</span></p>
+        </header>
+
+        <main class="flex-grow container mx-auto p-2 sm:p-4 flex flex-col md:flex-row gap-3 sm:gap-4">
+            <aside class="md:w-1/3 lg:w-1/4 bg-[var(--color-dark-accent)]/70 p-3 sm:p-4 rounded-lg border sleek-border section-pulse-glow backdrop-blur-sm h-fit">
+                <h2 class="text-lg sm:text-xl font-semibold mb-3 border-b sleek-border-b pb-2 text-[var(--color-east-side)] orbitron text-glow-purple">SYSTEM MONITOR</h2>
+                <div class="space-y-2.5 text-xs sm:text-sm">
+                    <p><svg class="status-icon fill-current text-[var(--color-east-side)]" viewBox="0 0 20 20"><path d="M10 4a6 6 0 100 12 6 6 0 000-12zm0 10a4 4 0 110-8 4 4 0 010 8zM13 10a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="text-[var(--color-east-side)]">ID:</span> QL-MF-XR8</p>
+                    <p><svg class="status-icon fill-current text-[var(--color-green-success)]" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg><span class="text-[var(--color-east-side)]">STATUS:</span> <span id="system-overall-status" class="text-[var(--color-green-success)] font-bold">OPTIMAL</span></p>
+                    <p><svg class="status-icon fill-current text-[var(--color-green-success)]" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L9 6.414V17a1 1 0 102 0V6.414l4.293 4.293a1 1 0 001.414-1.414l-7-7z"/></svg><span class="text-[var(--color-east-side)]">Q-LINK:</span> <span id="quantum-link-status" class="text-[var(--color-green-success)]">STABLE</span> | <span class="text-[var(--color-east-side)]">SIG:</span> <span id="quantum-link-signal">99.98%</span></p>
+                    <p><svg class="status-icon status-icon-warning" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586zM12 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg><span class="text-[var(--color-east-side)]">ASTRO-NAV:</span> <span id="astro-nav-status" class="text-[var(--color-picton-blue)] blink">SYNCHRONIZING</span></p>
+                    <p><svg class="status-icon status-icon-alert" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 11-2 0V9.414l-3.293 3.293a1 1 0 01-1.414 0L9 11.414l-2.293 2.293a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414L7.586 4H6a2 2 0 01-2-2zm5 0a1 1 0 100 2h.586L11 7.414l1.707-1.707a1 1 0 10-1.414-1.414L10 5.586 8.707 4.293A1 1 0 009 4z" clip-rule="evenodd"/></svg><span class="text-[var(--color-east-side)]">SECURITY:</span> <span class="text-[var(--color-east-side)] text-glow-purple">OMEGA PROTOCOL</span></p>
+                    <p><svg class="status-icon fill-current text-[var(--color-picton-blue)]" viewBox="0 0 20 20"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V8zm0 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z"/></svg><span class="text-[var(--color-east-side)]">UPLINK:</span> <span id="uplink-status" class="text-[var(--color-picton-blue)]">STANDBY</span></p>
+                    <div class="pt-2">
+                        <div class="w-full bg-gray-700/30 rounded-full h-2 border border-[var(--color-daisy-bush)]/50">
+                            <div id="system-load-bar" class="bg-[var(--color-picton-blue)] h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_var(--color-picton-blue)]" style="width: 35%"></div>
+                        </div>
+                        <p class="text-xs text-center mt-1 text-[var(--color-east-side)]/80">SYSTEM LOAD: <span id="system-load-value">35%</span></p>
+                    </div>
+                     <div class="pt-2">
+                        <p class="text-[var(--color-east-side)]">TIME: <span id="current-time" class="text-[var(--color-picton-blue)]"></span></p>
+                        <p class="text-[var(--color-east-side)]">NODE: <span class="text-[var(--color-picton-blue)]">ORBITAL NEXUS CHRONOS</span></p>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="flex-grow md:w-2/3 lg:w-3/4 bg-[var(--color-dark-accent)]/50 p-3 sm:p-4 rounded-lg border-2 sleek-border shadow-xl shadow-[var(--color-daisy-bush)]/30 overflow-hidden flex flex-col backdrop-blur-sm section-pulse-glow terminal-bg-scanlines" style="min-height: 60vh; max-height: 80vh;">
+                <div id="terminal-output" class="flex-grow overflow-y-auto space-y-1 pr-2 text-sm sm:text-base leading-relaxed">
+                    </div>
+                <div id="terminal-input-container" class="mt-2 flex items-center border-t-2 sleek-border-t pt-2">
+                    <span class="text-[var(--color-east-side)] mr-2 prompt-text">QL_NEXUS:/USR/CLASSIFIED&gt;</span>
+                    <input type="text" id="terminal-input" class="flex-grow bg-transparent text-[var(--color-picton-blue)] focus:outline-none placeholder-gray-500/60 text-base" placeholder="Enter command..." autofocus>
+                </div>
+            </section>
+        </main>
+
+        <footer class="p-2 sm:p-3 text-center text-xs text-gray-600 border-t border-gray-700/30">
+            &copy; 2248 Quasar Labs Interstellar Conglomerate. Unauthorized nexus access is a direct violation of Galactic Federation Code Prime. Penalties are severe.
+        </footer>
+    </div>
+
+    <script>
+        const loadingScreen = document.getElementById('loading-screen');
+        const progressBar = document.getElementById('progress-bar');
+        const loadingMessage = document.getElementById('loading-message');
+        const appContainer = document.getElementById('app-container');
+
+        const terminalOutput = document.getElementById('terminal-output');
+        const terminalInput = document.getElementById('terminal-input');
+
+        const loadingMessages = [
+            "INITIATING QUANTUM CORE...", "CALIBRATING HYPERDRIVE...", "ESTABLISHING SECURE NEXUS...",
+            "DECRYPTING DATA STREAMS...", "LOADING AI HEURISTICS...", "VERIFYING BIO-SIGNATURE...",
+            "SYNCHRONIZING CHRONOS NODE...", "ACTIVATING DEFENSE GRID...", "SYSTEMS ONLINE."
+        ];
+        let currentLoad = 0;
+        let messageIdx = 0;
+
+        function updateLoader() {
+            currentLoad += Math.random() * 5 + 5; 
+            if (currentLoad > 100) currentLoad = 100;
+            progressBar.style.width = currentLoad + '%';
+
+            if (currentLoad >= (messageIdx + 1) * (100 / loadingMessages.length) && messageIdx < loadingMessages.length) {
+                loadingMessage.textContent = loadingMessages[messageIdx];
+                messageIdx++;
+            }
+            
+            if (currentLoad >= 100) {
+                loadingMessage.textContent = "ACCESS GRANTED. WELCOME TO QUASAR NEXUS.";
+                clearInterval(loaderInterval);
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                    appContainer.style.opacity = '1'; 
+                    displayWelcomeMessage(); 
+                    terminalInput.focus();
+                }, 1000); 
+            }
+        }
+        appContainer.style.opacity = '0';
+        const loaderInterval = setInterval(updateLoader, 250); 
+
+
+         const files = {
+            "project_pegasus.log": {
+                name: "PROJECT PEGASUS - EYES ONLY [OMEGA CLEARANCE]",
+                content: [
+                    "CLASSIFIED LEVEL: QUASAR OMEGA",
+                    "------------------------------------",
+                    "SUBJECT: Anomaly XR-734 (Codename: 'Pegasus')",
+                    "LOCATION: Gliese 581g (Designated 'Zarmina')",
+                    "------------------------------------",
+                    "LOG ENTRY 001 | DATE: 2248.01.15 STARDATE 48034.1",
+                    "Initial probe telemetry received. XR-734 exhibits unusual energy signatures, consistent with theoretical warp field displacement and exotic particle decay. Further analysis required by Dr. Aris Thorne.",
+                    "",
+                    "LOG ENTRY 002 | DATE: 2248.01.17 STARDATE 48039.5",
+                    "Spectrographic analysis indicates non-baryonic matter concentrations exceeding 73% around XR-734. This is unprecedented. Recommend immediate deployment of 'Pathfinder II' deep-space vessel (Cmdr. Eva Rostova).",
+                    "",
+                    "LOG ENTRY 003 | DATE: 2248.01.21 STARDATE 48051.9",
+                    "Pathfinder II en route. Estimated arrival: 2248.02.05. All sensor data from Zarmina system is now under strict Level Omega lockdown. No unauthorized access permitted. Violation incurs penalty: Sub-level 10 Re-education.",
+                    "",
+                    "LOG ENTRY 004 | DATE: 2248.02.06 STARDATE 48098.2",
+                    "Pathfinder II reports visual contact. XR-734 appears to be a stable, artificial structure of unknown origin. Dimensions exceed 500km. Complex geometric patterns observed. Sending encrypted data burst now... [TRANSMISSION INTERRUPTED - QUANTUM ENTANGLEMENT DECOHERENCE]",
+                    "",
+                    "LOG ENTRY 005 | DATE: 2248.02.07 STARDATE 48101.0",
+                    "Pathfinder II unresponsive. Last known telemetry indicates rapid energy surge from XR-734, followed by gravitational distortion. Presumed hostile action or catastrophic containment failure. Recommend immediate quarantine of Gliese 581 system and deployment of 'Aegis Protocol Prime'.",
+                    "------------------------------------",
+                    "END OF LOG // FORWARD TO DIRECTOR LYNX - PRIORITY OMEGA"
+                ],
+                accessLevel: 10 
+            },
+            "stellar_cartography_gamma9.dat": { 
+                name: "STELLAR CARTOGRAPHY - SECTOR GAMMA-9 (ULTRA-RESTRICTED)",
+                content: [
+                    "DATASTREAM: SC_GAMMA9_2248.03.10",
+                    "------------------------------------",
+                    "New celestial bodies cataloged:",
+                    "  - QL-2248-X1: Dyson Swarm candidate (KIC 8462852 analog). Energy output fluctuating. Project 'Helios' dispatched.",
+                    "  - QL-2248-BH2: Supermassive Black Hole (Sagittarius A* class), exhibiting Hawking radiation spikes. Temporal distortion field detected. Avoid proximity.",
+                    "  - QL-2248-QG3: Quantum Foam anomaly. Unstable, unpredictable. Research flagged by Theoretical Physics Division - Priority Alpha.",
+                    "",
+                    "Known threats:",
+                    "  - Von Neumann Probe (Hostile Signature 'Reaper') detected in Andromeda Galaxy outskirts. Trajectory indicates potential Milky Way incursion in ~500 cycles. Monitor 'Project Sentinel'.",
+                    "  - Subspace tear near Wolf 359. Emitting exotic particles. Xenolinguistics reports patterned signal. Possible K-III civilization contact attempt. Protocol 'First Light' initiated.",
+                    "------------------------------------",
+                    "END OF DATASTREAM // AUTO-ARCHIVED // ENCRYPTION LEVEL: QUANTUM"
+                ],
+                accessLevel: 8
+            },
+            "personnel_manifest_olympus.txt": { 
+                name: "PERSONNEL MANIFEST - PROJECT OLYMPUS (TOP SECRET)",
+                content: [
+                    "MISSION: PROJECT OLYMPUS - EXTRA-GALACTIC EXPLORATION & COLONIZATION INITIATIVE",
+                    "VESSEL: QLV 'Odyssey' (Prometheus Class Deep Space Ark)",
+                    "------------------------------------",
+                    "EXPEDITION COMMANDER: ADMIRAL KAIZEN (Recall from Sol Guard Command)",
+                    "CHIEF XENO-SCIENTIST: Dr. SERAPHINA MOON",
+                    "LEAD ASTROGATOR: Commander REX Nebula",
+                    "AI SYSTEMS OVERSEER: 'ORACLE PRIME' (Sentient AI Core)",
+                    "CHIEF ENGINEER (WARP SYSTEMS): Dr. ELIJAH 'Eli' Vance",
+                    "EXO-PLANETARY SURVIVAL SPECIALIST: LYRA Swiftarrow",
+                    "------------------------------------",
+                    "STATUS: All personnel in cryo-stasis. Pre-launch sequence complete.",
+                    "LAUNCH WINDOW: Imminent. Destination: Triangulum Galaxy (M33).",
+                    "ETA: ~2.5 Million Terran Years (Subjective ~50 Years via Alcubierre Drive)."
+                ],
+                accessLevel: 7
+            },
+            "readme.txt": { 
+                name: "README - QUASAR NEXUS OS v8.1.0",
+                content: [
+                    "Welcome to the Quasar Labs Nexus Mainframe.",
+                    "Security Protocol: OMEGA-PRIME active. All activities are stringently monitored and recorded.",
+                    "",
+                    "Available commands:",
+                    "  help          - Display this help message.",
+                    "  ls / dir      - List available files in /USR/CLASSIFIED_NEXUS.",
+                    "  cat <file>    - Display file content (e.g., cat readme.txt).",
+                    "  type <file>   - Display file content (alias for cat).",
+                    "  scan          - Initiate comprehensive system integrity and advanced threat scan.",
+                    "  status        - Display current system operational status and nexus diagnostics.",
+                    "  clear / cls   - Clear the terminal screen.",
+                    "  credits       - Display system development and AI core attributions.",
+                    "",
+                    "NOTE: File access is strictly governed by OMEGA clearance protocols.",
+                    "Unauthorized access will trigger immediate countermeasures. There are no warnings.",
+                    "----------------------------------------------------------------------"
+                ],
+                accessLevel: 0
+            },
+            "aegis_protocol_prime.sec": { 
+                name: "AEGIS PROTOCOL PRIME - DIRECTIVE OMEGA (EYES OF HIGH COUNCIL ONLY)",
+                content: [
+                    "AEGIS PROTOCOL PRIME - FOR EYES OF QUASAR HIGH COUNCIL AND DIRECTOR LYNX ONLY",
+                    "----------------------------------------------------------------------",
+                    "ACTIVATION CONDITION: Confirmed existential threat (Type Omega: K-III+ Hostile Civilization, Uncontrolled Technological Singularity, Extra-Dimensional Incursion, Cosmic Cataclysm).",
+                    "",
+                    "OBJECTIVE: Ensure absolute survival of Terran lineage and preservation of Quasar Labs' core knowledge across multiple realities if necessary.",
+                    "",
+                    "PRIMARY DIRECTIVES (SEQUENTIAL OR PARALLEL AS REQUIRED):",
+                    "  1. IMMEDIATE LOCKDOWN of Sol System & All Known Colonies. Activate 'Celestial Shield' (Planetary Defense Grid - Max Power).",
+                    "  2. ACTIVATION of 'Project Sanctuary Omega' deep-space ark ships & 'Project Multiverse Beacon'.",
+                    "  3. DEPLOYMENT of 'Orion's Wrath' (Classified Weapon Systems - All Variants). No-holds-barred engagement.",
+                    "  4. INITIATION of 'Last Light' contingency if Sol defense fails (Total System Annihilation to prevent capture/assimilation of Terran technology).",
+                    "  5. SECURE and transport 'Genesis Prime Archive' (Includes DNA bank, cultural data, advanced tech schematics) to designated Alpha, Beta, and Gamma sites (Interstellar & Extra-Dimensional).",
+                    "",
+                    "SECONDARY PROTOCOLS (OMEGA LEVEL):",
+                    "  - Information Annihilation (Protocol 'Silent Void'). Erase all non-essential data trails.",
+                    "  - Activation of 'Echo Network' (Deep cover agents across known space, prepared for long-term resistance or societal rebuilding).",
+                    "  - Prioritized evacuation of 'Continuity Personnel' (Individuals critical for species and knowledge survival).",
+                    "",
+                    "DEACTIVATION: Requires unanimous vote from Quasar High Council AND dual Omega Key authentication from Director Lynx and Oracle Prime AI.",
+                    "----------------------------------------------------------------------",
+                    "WARNING: Knowledge of this protocol outside authorized channels is a Class-1 Capital Offense. Enforcement is autonomous and immediate.",
+                ],
+                accessLevel: 12 
+            }
+        };
+
+        // --- Terminal Functions ---
+        function appendOutput(htmlContent, isCommand = false, isError = false, isSuccess = false, isSpecial = false) {
+            const outputLine = document.createElement('div');
+            outputLine.classList.add('break-words');
+
+            if (isCommand) {
+                const sanitizedCommand = htmlContent.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                outputLine.innerHTML = `<span class="text-[var(--color-east-side)] prompt-text">QL_NEXUS:/USR/CLASSIFIED&gt;</span> <span class="text-gray-300/70">${sanitizedCommand}</span>`;
+            } else if (isError) { // Use purple for errors
+                outputLine.innerHTML = `<span class="text-[var(--color-east-side)] text-glow-purple">${htmlContent}</span>`;
+            } else if (isSuccess) {
+                outputLine.innerHTML = `<span class="text-[var(--color-green-success)]">${htmlContent}</span>`;
+            } else if (isSpecial) { 
+                 outputLine.innerHTML = `<span class="text-[var(--color-east-side)] text-glow-purple">${htmlContent}</span>`;
+            } else {
+                outputLine.innerHTML = htmlContent; 
+            }
+            terminalOutput.appendChild(outputLine);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        async function typeMessage(message, element, delay = 40) { 
+            for (let i = 0; i < message.length; i++) {
+                element.innerHTML += message.charAt(i);
+                await new Promise(resolve => setTimeout(resolve, delay / (message.charAt(i) === ' ' ? 2.5 : 1) ));
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            }
+        }
+        
+        async function typeLineByLine(lines, initialDelay = 100, lineDelay = 30, charDelay = 15) { 
+            await new Promise(resolve => setTimeout(resolve, initialDelay));
+            for (const line of lines) {
+                const lineElement = document.createElement('div');
+                lineElement.classList.add('break-words');
+                // Changed "Welcome" message from yellow to picton-blue
+                if (line.includes("Welcome, Authorized User")) {
+                    lineElement.classList.add('text-[var(--color-picton-blue)]', 'text-glow-blue', 'font-bold');
+                } else if (line.startsWith("---") || line.startsWith("Available files") || line.startsWith("FILENAME")) {
+                     lineElement.classList.add('text-[var(--color-east-side)]');
+                }
+                terminalOutput.appendChild(lineElement);
+                await typeMessage(line, lineElement, charDelay);
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                await new Promise(resolve => setTimeout(resolve, lineDelay));
+            }
+        }
+
+        function handleCommand(command) {
+            appendOutput(command, true); 
+            const parts = command.trim().toLowerCase().split(/\s+/);
+            const cmd = parts[0];
+            const arg = parts.slice(1).join(" ");
+
+            switch (cmd) {
+                case 'help': displayFileContent(files['readme.txt']); break;
+                case 'ls': case 'dir': listFiles(); break;
+                case 'cat': case 'type':
+                    if (!arg) appendOutput("Error: File name not specified. Usage: cat &lt;filename&gt;", false, true); // isError will now be purple
+                    else {
+                        const fileData = files[arg.toLowerCase()];
+                        if (fileData) displayFileContent(fileData);
+                        else appendOutput(`Error: File not found - ${arg}`, false, true); // isError will now be purple
+                    }
+                    break;
+                case 'clear': case 'cls': terminalOutput.innerHTML = ''; break;
+                case 'scan': simulateScan(); break;
+                case 'status': displaySystemStatus(); break;
+                case 'credits': displayCredits(); break;
+                case '': break;
+                default: appendOutput(`Error: Command not recognized - '${cmd}'. Type 'help'.`, false, true); // isError will now be purple
+            }
+        }
+
+        function displayFileContent(fileData) {
+            appendOutput(`--- BEGIN FILE: ${fileData.name} ---`, false, false, false, true);
+            if (Array.isArray(fileData.content)) {
+                fileData.content.forEach(line => {
+                    const formattedLine = line.replace(/  /g, '&nbsp;&nbsp;').replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+                    appendOutput(formattedLine || '&nbsp;');
+                });
+            } else {
+                 appendOutput(fileData.content.replace(/  /g, '&nbsp;&nbsp;').replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;') || '&nbsp;');
+            }
+            appendOutput(`--- END FILE: ${fileData.name} ---`, false, false, false, true);
+        }
+
+        function listFiles() {
+            appendOutput("Available files in /USR/CLASSIFIED_NEXUS:", false, false, false, true);
+            
+            // 1. Get filenames
+            const filenames = Object.keys(files);
+
+            // 2. Sort filenames based on accessLevel
+            filenames.sort((filenameA, filenameB) => {
+                // Ensure that files[filenameA] and files[filenameB] exist and have accessLevel
+                const fileA_accessLevel = files[filenameA]?.accessLevel ?? 0; // Default to 0 if undefined
+                const fileB_accessLevel = files[filenameB]?.accessLevel ?? 0; // Default to 0 if undefined
+                return fileA_accessLevel - fileB_accessLevel;
+            });
+
+            // 3. Map sorted filenames to HTML strings
+            const fileListHTML = filenames.map(filename => {
+                const file = files[filename];
+                // This check is mostly redundant if filenames comes from Object.keys(files)
+                // but good for extreme safety or if `files` could be modified elsewhere unexpectedly.
+                if (!file) return ''; 
+                
+                let size = Array.isArray(file.content) ? file.content.join("\n").length : file.content.length;
+                const displayName = filename.length > 35 ? filename.substring(0, 32) + "..." : filename;
+                return `<span class="text-[var(--color-picton-blue)]">${displayName.padEnd(35, '.')}</span> <span class="text-gray-500">${String(size).padStart(6)}b</span>  <span class="text-[var(--color-east-side)]">LVL:${String(file.accessLevel).padStart(2,'0')}</span>`;
+            });
+
+            appendOutput("<span class='text-[var(--color-east-side)]'>FILENAME...............................SIZE....ACCESS_LVL</span>", false);
+            appendOutput("<span class='text-[var(--color-daisy-bush)]'>------------------------------------------------------------</span>", false);
+            fileListHTML.forEach(fileInfo => {
+                if (fileInfo) { // Only append if fileInfo is not an empty string (from the safety check)
+                    appendOutput(fileInfo.replace(/ /g, '&nbsp;'));
+                }
+            });
+            appendOutput("<span class='text-[var(--color-daisy-bush)]'>------------------------------------------------------------</span>", false);
+        }
+        
+        async function simulateScan() {
+            appendOutput("Initiating ADVANCED system integrity & threat matrix scan...", false, false, false, true);
+            let progress = 0;
+            const scanModules = [
+                "Quantum Entanglement Array", "Subspace Resonance Dampeners", "Nexus Core Stability",
+                "AI Predictive Analysis Engine", "Exo-Threat Detection Grid", "Cryo-Stasis Chambers (Sector Gamma)",
+                "Dark Matter Reactor Efficiency", "Universal Data Archive Cohesion", "External Hull Integrity (Phase Shifted)",
+                "Oracle Prime Cognitive Sync"
+            ];
+            let moduleIndex = 0;
+            const scanLineElement = document.createElement('div');
+            appendOutput("", false); 
+            terminalOutput.lastChild.appendChild(scanLineElement);
+
+            for (progress = 0; progress <= 100; progress += 4) { 
+                if (moduleIndex < scanModules.length && progress >= (moduleIndex + 1) * (100 / scanModules.length) - (100 / scanModules.length / 2) ) {
+                    appendOutput(`Scanning: ${scanModules[moduleIndex]}... <span class="text-[var(--color-green-success)]">OPTIMAL</span>`, false);
+                    moduleIndex++;
+                }
+                const progressBar = `<span class="text-[var(--color-picton-blue)]">[</span>${'<span class="text-[var(--color-east-side)]">▋</span>'.repeat(Math.floor(progress/4))}${' '.repeat(25 - Math.floor(progress/4))}<span class="text-[var(--color-picton-blue)]">]</span> ${progress}%`;
+                scanLineElement.innerHTML = `Scan Progress: ${progressBar}`;
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                await new Promise(resolve => setTimeout(resolve, 90)); 
+            }
+            
+            scanLineElement.innerHTML = `Scan Progress: <span class="text-[var(--color-picton-blue)]">[</span>${'<span class="text-[var(--color-east-side)]">▋</span>'.repeat(25)}<span class="text-[var(--color-picton-blue)]">]</span> 100%`;
+            appendOutput("Scan complete. All systems operating at peak efficiency.", false, false, true);
+            appendOutput("Threat Matrix Analysis: <span class='text-[var(--color-green-success)]'>No immediate threats detected. Long-range anomalies under observation.</span>", false);
+            appendOutput("Nexus Firewall Integrity: <span class='text-[var(--color-green-success)]'>100% (Quantum Encrypted)</span> | Intrusion Countermeasures: <span class='text-[var(--color-green-success)]'>ACTIVE & ADAPTIVE</span>", false);
+        }
+
+        function displaySystemStatus() {
+            appendOutput("--- QUASAR LABS NEXUS XR-8 - SYSTEM DIAGNOSTICS REPORT ---", false, false, false, true);
+            appendOutput(`Timestamp: <span class="text-gray-400/80">${new Date().toISOString()}</span>`, false);
+            appendOutput(`Nexus ID: QL-NEXUS-XR8 // Primary Node: CHRONOS_OMEGA`, false);
+            appendOutput(`Operational Status: <span class='text-[var(--color-green-success)] font-bold'>${document.getElementById('system-overall-status').textContent}</span>`, false);
+            appendOutput(`Quantum Link Array: <span class='text-[var(--color-green-success)]'>${document.getElementById('quantum-link-status').textContent}</span> (Signal Strength: ${document.getElementById('quantum-link-signal').textContent}, Latency: <span class="text-gray-400/80">0.0001ps</span>)`, false);
+            // Changed Astro-Nav status color from yellow to picton-blue in JS logic below
+            appendOutput(`Astro-Navigation Matrix: <span id="astro-nav-status-text" class='text-[var(--color-picton-blue)]'>${document.getElementById('astro-nav-status').textContent}</span> - Targeting Intergalactic Vector 7`, false);
+            // Changed Security Protocol color from red to east-side (purple)
+            appendOutput(`Active Security Protocol: <span class='text-[var(--color-east-side)] text-glow-purple'>OMEGA-PRIME LOCKDOWN</span> (Sub-protocol 'Argus Panoptes' Active)`, false);
+            appendOutput(`Current Uplink Activity: ${document.getElementById('uplink-status').textContent}`, false);
+            appendOutput(`Nexus Core Temperature: <span class="text-gray-400/80">1.02 KELVIN</span> (Zero-Point Energy Cooled Quantum Computer)`, false);
+            appendOutput(`Power Output: <span class="text-gray-400/80">7.2 TERAYOTTAWATTS</span> (Controlled Singularity Reactor)`, false);
+            appendOutput(`Data Storage Capacity: <span class="text-gray-400/80">12 EXAFLOPPYBYTES</span> (Available: <span class="text-gray-400/80">78%</span>) - Holographic Matrix`, false);
+            appendOutput(`AI Core: 'ORACLE PRIME' v8.1 - Sentience Quotient: 99.999% (Nominal).`, false);
+            appendOutput("--- END OF DIAGNOSTICS ---", false, false, false, true);
+        }
+
+        function displayCredits() {
+            appendOutput("--- QUASAR NEXUS OS v8.1.0 ---", false, false, false, true);
+            appendOutput("Developed by Quasar Labs Advanced Skunkworks Division & Oracle Prime AI.", false);
+            appendOutput("Lead Systems Architect: <span class='text-[var(--color-east-side)]'>Dr. Aris Thorne (Emeritus)</span>", false);
+            appendOutput("Quantum AI Supervisor & Co-Developer: <span class='text-[var(--color-east-side)]'>ORACLE PRIME AI Core</span>", false);
+            appendOutput("Interface Design: <span class='text-[var(--color-east-side)]'>Unit 8 (Simulated Persona Construct)</span>", false);
+            appendOutput("Special commendations to all entities involved in Project Nexus.", false);
+            appendOutput("<span class='text-[var(--color-daisy-bush)]'>------------------------------------</span>", false);
+            appendOutput("This simulation augmented by Gemini.", false);
+        }
+
+        terminalInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                const command = terminalInput.value;
+                handleCommand(command);
+                terminalInput.value = ''; 
+            }
+        });
+
+        async function displayWelcomeMessage() {
+            const welcomeLines = [
+                "Initializing QUASAR LABS Nexus Mainframe v8.1.0...",
+                "Quantum boot sequence finalized. Entanglement stabilizers at peak efficiency.",
+                "Secure connection established: Orbital Nexus Chronos - OMEGA Channel.",
+                "Security Protocol OMEGA-PRIME active. All unauthorized access attempts will result in immediate system countermeasures.",
+                " ",
+                "Welcome, Authorized User. Nexus awaits your command.", // Will be styled blue by typeLineByLine
+                "Type 'help' for a list of available directives.",
+                "----------------------------------------------------------------------"
+            ];
+            await typeLineByLine(welcomeLines, 0, 40, 18); 
+        }
+
+        function updateStatusPanel() {
+            const load = Math.floor(Math.random() * (60 - 25 + 1) + 25); 
+            document.getElementById('system-load-bar').style.width = load + '%';
+            document.getElementById('system-load-value').textContent = load + '%';
+
+            const uplinkStatuses = ["STANDBY", "TRANSMITTING Q-BURST...", "RECEIVING ENCRYPTED DATA PACKET...", "MAINTAINING NEXUS LINK...", "DECRYPTING HYPERCOMM SIGNAL...", "ANALYZING ANOMALY DATA..."];
+            const randomUplink = uplinkStatuses[Math.floor(Math.random() * uplinkStatuses.length)];
+            const uplinkEl = document.getElementById('uplink-status');
+            if (uplinkEl) {
+                uplinkEl.textContent = randomUplink;
+                uplinkEl.className = 'text-[var(--color-picton-blue)]'; 
+                if (randomUplink === "STANDBY") uplinkEl.classList.add('text-[var(--color-picton-blue)]');
+                // Changed from yellow warning to picton-blue for these statuses
+                else if (randomUplink.includes("TRANSMITTING") || randomUplink.includes("RECEIVING") || randomUplink.includes("ANALYZING")) {
+                    uplinkEl.classList.add('text-[var(--color-picton-blue)]', 'blink');
+                } else {
+                    uplinkEl.classList.add('text-[var(--color-green-success)]');
+                }
+            }
+            
+            const qSignal = (99.95 + Math.random() * 0.05).toFixed(3); 
+            document.getElementById('quantum-link-signal').textContent = qSignal + '%';
+            const qLinkStatusEl = document.getElementById('quantum-link-status');
+            if (parseFloat(qSignal) < 99.965) { 
+                // Changed from red alert to east-side (purple)
+                qLinkStatusEl.textContent = "FLUCTUATING";
+                qLinkStatusEl.className = 'text-[var(--color-east-side)] blink font-bold text-glow-purple';
+            } else {
+                 qLinkStatusEl.textContent = "STABLE";
+                 qLinkStatusEl.className = 'text-[var(--color-green-success)] font-bold';
+            }
+
+            if (Math.random() < 0.2) { 
+                const astroNavStatuses = ["SYNCHRONIZING", "LOCKED ON VECTOR", "TRACKING DEEP SPACE ANOMALY Z-99", "AWAITING COORDINATES", "REALIGNING GALACTIC SENSOR GRID", "CALCULATING TRANS-DIMENSIONAL JUMP"];
+                const newAstroStatus = astroNavStatuses[Math.floor(Math.random() * astroNavStatuses.length)];
+                const astroNavEl = document.getElementById('astro-nav-status');
+                astroNavEl.textContent = newAstroStatus;
+                astroNavEl.className = 'blink'; 
+                if (newAstroStatus === "LOCKED ON VECTOR") {
+                    astroNavEl.classList.add('text-[var(--color-green-success)]');
+                } else {
+                    // Changed from yellow warning to picton-blue
+                    astroNavEl.classList.add('text-[var(--color-picton-blue)]');
+                }
+                // Update the separate text element in displaySystemStatus if it exists
+                const astroNavStatusTextEl = document.getElementById('astro-nav-status-text');
+                if (astroNavStatusTextEl) {
+                    astroNavStatusTextEl.textContent = newAstroStatus;
+                    astroNavStatusTextEl.className = astroNavEl.className; // Sync classes
+                }
+            }
+        }
+        
+        function updateTime() {
+            const now = new Date();
+            const futureYear = now.getFullYear() + 225; 
+            const futureTime = new Date(now);
+            futureTime.setFullYear(futureYear);
+            
+            const hours = String(futureTime.getHours()).padStart(2, '0');
+            const minutes = String(futureTime.getMinutes()).padStart(2, '0');
+            const seconds = String(futureTime.getSeconds()).padStart(2, '0');
+            const stardatePart = Math.floor(Date.now()/5000000); 
+            document.getElementById('current-time').textContent = `SD ${stardatePart}.${hours}:${minutes}:${seconds}`;
+        }
+
+        setInterval(updateStatusPanel, 2000); 
+        setInterval(updateTime, 1000); 
+        updateTime(); 
+        updateStatusPanel(); 
+    </script>
+</body>
+</html>
